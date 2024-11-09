@@ -28,45 +28,54 @@ local BloxFruitsSection = BloxFruitsTab:NewSection("BloxFruits Features")
 local SettingsSection = SettingsTab:NewSection("Settings")
 
 -- Variables
-local AutoFarmEnabled = false
 local mainUIVisible = true
 local ESPEnabled = false
+local AutoGKEnabled = false
+local AutoFarmEnabled = false
 
--- Function to Get Quest Information Based on Player Level
+-- ESP Feature
+local function ToggleESP(state)
+    ESPEnabled = state
+    if ESPEnabled then
+        print("ESP Enabled")
+        -- Code for enabling ESP: Highlight players, parts, etc.
+    else
+        print("ESP Disabled")
+        -- Code for disabling ESP
+    end
+end
+
+ESPSection:NewToggle("Enable ESP", "Highlights all players and parts within range", function(state)
+    ToggleESP(state)
+end)
+
+-- Function to determine quest giver and NPCs based on player's level
 local function GetQuestInfo(level)
-    if level < 50 then
-        return {
-            questGiver = workspace.QuestGivers:FindFirstChild("QuestGiver1"),
-            questNPCs = workspace.NPCs:FindFirstChild("LowLevelNPCs")
-        }
-    elseif level < 100 then
-        return {
-            questGiver = workspace.QuestGivers:FindFirstChild("QuestGiver2"),
-            questNPCs = workspace.NPCs:FindFirstChild("MidLevelNPCs")
-        }
-    else
-        return {
-            questGiver = workspace.QuestGivers:FindFirstChild("QuestGiver3"),
-            questNPCs = workspace.NPCs:FindFirstChild("HighLevelNPCs")
-        }
+    local questGivers = workspace:FindFirstChild("QuestGivers") -- Find the folder by name
+    if not questGivers then
+        print("Warning: QuestGivers folder not found!")
+        return
     end
+
+    -- Assuming quest giver names are like "QuestGiver1", "QuestGiver2", etc.
+    local questGiverName = "QuestGiver" .. math.floor(level / 50) + 1
+    local questGiver = questGivers:FindFirstChild(questGiverName)
+
+    -- Assuming NPC group names are like "NPCGroup1", "NPCGroup2", etc.
+    local npcGroupName = "NPCGroup" .. math.floor(level / 50) + 1
+    local questNPCs = workspace.NPCs:FindFirstChild(npcGroupName)
+
+    return {
+        questGiver = questGiver,
+        questNPCs = questNPCs
+    }
 end
 
--- Function to Interact with Quest Giver
-local function InteractWithQuestGiver(questGiver)
-    if questGiver and questGiver:FindFirstChild("DialoguePrompt") then
-        fireproximityprompt(questGiver.DialoguePrompt)
-        print("Interacting with quest giver to start quest")
-    else
-        print("Quest giver or DialoguePrompt not found")
-    end
-end
-
--- Function for AutoFarm
+-- AutoFarm Feature with Quest Taking
 local function AutoFarm()
     local player = game.Players.LocalPlayer
     local character = player.Character or player.CharacterAdded:Wait()
-    local level = player.Data.Level.Value  -- Adjust this path based on actual level location
+    local level = player.Data.Level.Value  -- Replace with actual path to player level
 
     local questInfo = GetQuestInfo(level)
     if not questInfo.questGiver or not questInfo.questNPCs then
@@ -74,99 +83,20 @@ local function AutoFarm()
         return
     end
 
-    -- Move to Quest Giver and Interact
+    -- Go to the quest giver
     character:MoveTo(questInfo.questGiver.HumanoidRootPart.Position)
     wait(1)
-    InteractWithQuestGiver(questInfo.questGiver)
+
+    -- Interact with quest giver to accept quest
+    fireproximityprompt(questInfo.questGiver.DialoguePrompt)  -- Replace with actual proximity prompt if needed
     wait(1)
 
-    -- Move to each NPC in the quest group and attack
     while AutoFarmEnabled do
-        wait(0.5)
+        wait(0.5) -- Small delay to prevent overwhelming the game
+
+        -- Go to the quest NPCs
         for _, npc in pairs(questInfo.questNPCs:GetChildren()) do
             if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
-                print("Moving to NPC: " .. npc.Name)
                 character:MoveTo(npc.HumanoidRootPart.Position)
-                wait(0.3)
-                keypress(Enum.KeyCode.One) -- Equip weapon
-                wait(0.1)
-                mouse1press() -- Start attacking
-                wait(0.5)
-                mouse1release() -- Stop attacking
-                print("Attacked NPC: " .. npc.Name)
-            end
-        end
-    end
-end
-
--- Toggle for AutoFarm
-BloxFruitsSection:NewToggle("Enable AutoFarm", "Automatically farms NPCs based on your level", function(state)
-    AutoFarmEnabled = state
-    if AutoFarmEnabled then
-        print("AutoFarm enabled")
-        AutoFarm()
-    else
-        print("AutoFarm disabled")
-    end
-end)
-
--- Teleport Tool
-local function CreateTeleportTool()
-    local tool = Instance.new("Tool")
-    tool.RequiresHandle = false
-    tool.Name = "TeleportTool"
-    tool.Activated:Connect(function()
-        local player = game.Players.LocalPlayer
-        local mouse = player:GetMouse()
-        if mouse.Target then
-            local teleportPosition = mouse.Hit.p
-            player.Character:MoveTo(teleportPosition)
-            print("Teleported to: " .. tostring(teleportPosition))
-        end
-    end)
-    tool.Parent = game.Players.LocalPlayer.Backpack
-end
-
-MainSection:NewButton("Equip Teleport Tool", "Click anywhere to teleport", function()
-    CreateTeleportTool()
-end)
-
--- Settings Features
-SettingsSection:NewLabel("Credits")
-SettingsSection:NewLabel("Script by: hamadlla")
-
-SettingsSection:NewLabel("Customize Theme")
-SettingsSection:NewColorPicker("Scheme Color", "Change the scheme color", colors.SchemeColor, function(color)
-    colors.SchemeColor = color
-end)
-
-SettingsSection:NewColorPicker("Background Color", "Change the background color", colors.Background, function(color)
-    colors.Background = color
-end)
-
-SettingsSection:NewColorPicker("Text Color", "Change the text color", colors.TextColor, function(color)
-    colors.TextColor = color
-end)
-
--- UI Toggle Button (Black Square)
-local toggleButton = Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))
-toggleButton.Name = "ToggleUIButton"
-
-local buttonFrame = Instance.new("TextButton", toggleButton)
-buttonFrame.Size = UDim2.new(0, 50, 0, 50)
-buttonFrame.Position = UDim2.new(0, 10, 0, 10)
-buttonFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-buttonFrame.Text = ""
-buttonFrame.BorderSizePixel = 0
-
-buttonFrame.MouseButton1Click:Connect(function()
-    mainUIVisible = not mainUIVisible
-    Library:ToggleUI()
-end)
-
--- Continuously Update the Script
-game:GetService("RunService").RenderStepped:Connect(function()
-    if AutoFarmEnabled then
-        AutoFarm()
-    end
-end)
+                wait(0.3)  -- Wait briefly for teleport
+                keypress(Enum.KeyCode.One) -- Press
