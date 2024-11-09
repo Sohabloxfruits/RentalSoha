@@ -28,92 +28,85 @@ local BloxFruitsSection = BloxFruitsTab:NewSection("BloxFruits Features")
 local SettingsSection = SettingsTab:NewSection("Settings")
 
 -- Variables
+local AutoFarmEnabled = false
 local mainUIVisible = true
 local ESPEnabled = false
-local AutoGKEnabled = false
-local AutoFarmEnabled = false
 
--- ESP Feature
-local function ToggleESP(state)
-    ESPEnabled = state
-    if ESPEnabled then
-        print("ESP Enabled")
-        -- Code for enabling ESP: Highlight players, parts, etc.
-    else
-        print("ESP Disabled")
-        -- Code for disabling ESP
-    end
-end
-
-ESPSection:NewToggle("Enable ESP", "Highlights all players and parts within range", function(state)
-    ToggleESP(state)
-end)
-
--- Function to determine quest giver and NPCs based on player's level
+-- Function to Get Quest Information Based on Player Level
 local function GetQuestInfo(level)
     if level < 50 then
         return {
-            questGiver = workspace.QuestGivers:FindFirstChild("QuestGiver1"),  -- Change to actual quest giver
-            questNPCs = workspace.NPCs:FindFirstChild("NPCGroup1")  -- Change to actual NPC group
+            questGiver = workspace.QuestGivers:FindFirstChild("QuestGiver1"),
+            questNPCs = workspace.NPCs:FindFirstChild("LowLevelNPCs")
         }
     elseif level < 100 then
         return {
             questGiver = workspace.QuestGivers:FindFirstChild("QuestGiver2"),
-            questNPCs = workspace.NPCs:FindFirstChild("NPCGroup2")
+            questNPCs = workspace.NPCs:FindFirstChild("MidLevelNPCs")
         }
     else
         return {
             questGiver = workspace.QuestGivers:FindFirstChild("QuestGiver3"),
-            questNPCs = workspace.NPCs:FindFirstChild("NPCGroup3")
+            questNPCs = workspace.NPCs:FindFirstChild("HighLevelNPCs")
         }
     end
 end
 
--- AutoFarm Feature with Quest Taking
+-- Function to Interact with Quest Giver
+local function InteractWithQuestGiver(questGiver)
+    if questGiver and questGiver:FindFirstChild("DialoguePrompt") then
+        fireproximityprompt(questGiver.DialoguePrompt)
+        print("Interacting with quest giver to start quest")
+    else
+        print("Quest giver or DialoguePrompt not found")
+    end
+end
+
+-- Function for AutoFarm
 local function AutoFarm()
     local player = game.Players.LocalPlayer
     local character = player.Character or player.CharacterAdded:Wait()
-    local level = player.Data.Level.Value  -- Replace with actual path to player level
-    
+    local level = player.Data.Level.Value  -- Adjust this path based on actual level location
+
     local questInfo = GetQuestInfo(level)
     if not questInfo.questGiver or not questInfo.questNPCs then
         print("Quest giver or NPC group not found for this level.")
         return
     end
 
-    -- Go to the quest giver
+    -- Move to Quest Giver and Interact
     character:MoveTo(questInfo.questGiver.HumanoidRootPart.Position)
     wait(1)
-
-    -- Interact with quest giver to accept quest
-    fireproximityprompt(questInfo.questGiver.DialoguePrompt)  -- Replace with actual proximity prompt if needed
+    InteractWithQuestGiver(questInfo.questGiver)
     wait(1)
 
+    -- Move to each NPC in the quest group and attack
     while AutoFarmEnabled do
-        wait(0.5) -- Small delay to prevent overwhelming the game
-
-        -- Go to the quest NPCs
+        wait(0.5)
         for _, npc in pairs(questInfo.questNPCs:GetChildren()) do
             if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                print("Moving to NPC: " .. npc.Name)
                 character:MoveTo(npc.HumanoidRootPart.Position)
-                wait(0.3)  -- Wait briefly for teleport
-                keypress(Enum.KeyCode.One) -- Press '1' to equip weapon
+                wait(0.3)
+                keypress(Enum.KeyCode.One) -- Equip weapon
                 wait(0.1)
-                mouse1press() -- Start autoclicking
+                mouse1press() -- Start attacking
                 wait(0.5)
-                mouse1release()
-                print("AutoFarm attacking: " .. npc.Name)
+                mouse1release() -- Stop attacking
+                print("Attacked NPC: " .. npc.Name)
             end
         end
     end
 end
 
-BloxFruitsSection:NewToggle("Enable AutoFarm", "Accepts quest and auto-attacks NPCs", function(state)
+-- Toggle for AutoFarm
+BloxFruitsSection:NewToggle("Enable AutoFarm", "Automatically farms NPCs based on your level", function(state)
     AutoFarmEnabled = state
     if AutoFarmEnabled then
+        print("AutoFarm enabled")
         AutoFarm()
     else
-        print("AutoFarm Disabled")
+        print("AutoFarm disabled")
     end
 end)
 
@@ -171,9 +164,9 @@ buttonFrame.MouseButton1Click:Connect(function()
     Library:ToggleUI()
 end)
 
--- Clean-up function to destroy unused UI elements
-game.Players.LocalPlayer.PlayerGui.ChildRemoved:Connect(function(child)
-    if child.Name == "PartNamesUI" then
-        child:Destroy()
+-- Continuously Update the Script
+game:GetService("RunService").RenderStepped:Connect(function()
+    if AutoFarmEnabled then
+        AutoFarm()
     end
 end)
